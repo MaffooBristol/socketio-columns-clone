@@ -1,4 +1,6 @@
 chalk = require 'chalk'
+_ = require 'underscore'
+{argv} = require 'yargs'
 
 grid = [
   #0 #1 #2 #3 #4 #5
@@ -39,8 +41,13 @@ chalkColours = [
 
 tick = null
 gridDrawing = []
+matchedMessages = {}
+
+# Number of colours, or null for full gamut. Don't use 1 or lower or 'BOOM'.
+numColours = argv.colours - 1 or (colours.length - 1)
 
 # Add slow but acceptable array rotation. Sure there's cleverer stuff out there.
+# It's technically folding/transposing, but rotate sounds better.
 Array::rotate = () ->
   newArr = []
   for row, ri in @
@@ -64,6 +71,7 @@ applyColumn = (column) ->
     else
       grid[j][column.x] = column.blocks[i]
   gridDrawing.push drawGrid grid
+  updateGrid grid
   die() if willDie
 
 start = () ->
@@ -82,7 +90,7 @@ columnTick = () ->
 
   # Create 3-colour array for blocks.
   for i in [0..2]
-    column.blocks.push 1 + Math.round Math.random() * (colours.length - 1)
+    column.blocks.push 1 + Math.round Math.random() * (numColours)
 
   # @todo Make asyncronous and based on a timer/actual ticks.
   _l = grid.length
@@ -99,7 +107,7 @@ columnTick = () ->
     column.y++
 
 
-checkLines = (_grid, _dir) ->
+updateLines = (_grid, _dir) ->
   for row, rowIndex in _grid
     matches = []
     for block, blockIndex in row
@@ -114,13 +122,18 @@ checkLines = (_grid, _dir) ->
       # Reset and push if it's a standard 'different' block.
         matches = [block]
       if matches.length >= 3
-        console.log " > Matched #{matches.length} on #{_dir} - index #{rowIndex}", matches
+        for i in [0..2]
+          _grid[rowIndex][blockIndex - i] = 0
+        matchedColours = matches.map (match) ->
+          return colours[match]
+        matchedMessages[rowIndex + '-' + blockIndex] = " > Matched #{matches.length} on #{_dir} - index #{rowIndex}/#{blockIndex} - #{matchedColours}"
+  return _grid
 
-checkGrid = (_grid) ->
+updateGrid = (_grid) ->
   # Check horizontal...
-  checkLines _grid, 'x'
+  grid = updateLines _grid, 'x'
   # Check vertical...
-  checkLines _grid.rotate(), 'y'
+  grid = (updateLines _grid.rotate(), 'y').rotate()
 
 drawGrid = (_grid) ->
   output = []
@@ -149,7 +162,8 @@ die = () ->
     console.log row.join '\n'
 
   console.log "You died lol! Moves: #{gridDrawing.length}"
-  checkGrid grid
+  updateGrid grid
+  console.log _.values(matchedMessages).join '\n'
 
   # Cheap exit ;)
   process.exit 0
