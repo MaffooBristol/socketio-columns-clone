@@ -20,6 +20,7 @@ grid = [
 ]
 
 colours = [
+  'black'
   'red'
   'orange'
   'yellow'
