@@ -57,10 +57,26 @@ Array::rotate = () ->
       newArr[ci][ri] = col
   return newArr
 
+# Split array into segments.
 Array::chunk = (chunkSize) ->
   array = this
   [].concat.apply [], array.map (elem, i) ->
     (if i % chunkSize then [] else [array.slice(i, i + chunkSize)])
+
+# Rotate the array 45 degrees.
+Array::rotate45 = ->
+  arr = this
+  # Max index of diagonal matrix.
+  summax = (arr.length - 1) * (arr[0].length - 1)
+  # Create empty matrix and push in the number of rows required.
+  rotated = []
+  for i in summax
+    rotated.push []
+  # Fill the new array by partitioning the original matrix.
+  for j in arr[0].length
+    for i in arr.length
+      rotated[i + j].push arr[i][j]
+  return rotated
 
 # Apply the current column to the grid.
 applyColumn = (column) ->
