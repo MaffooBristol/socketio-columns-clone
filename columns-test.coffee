@@ -20,9 +20,8 @@ grid = [
 ]
 
 colours = [
-  'black'
   'red'
-  'orange'
+  'white' #'orange' # Should be orange
   'yellow'
   'green'
   'blue'
@@ -102,13 +101,14 @@ columnTick = () ->
 
   column =
     blocks: []
+    blocksAsColours: []
     x: Math.round Math.random() * (grid[0].length - 1)
     y: 0
 
   # Create 3-colour array for blocks.
   for i in [0..2]
-    column.blocks.push 1 + Math.round Math.random() * (numColours)
-
+    x = column.blocks.push 1 + Math.round Math.random() * (numColours)
+    column.blocksAsColours.push colours[x]
   # @todo Make asyncronous and based on a timer/actual ticks.
   _l = grid.length
   for i in [0.._l]
@@ -142,7 +142,7 @@ updateLines = (_grid, _dir) ->
         for i in [0..2]
           _grid[rowIndex][blockIndex - i] = 0
         matchedColours = matches.map (match) ->
-          return colours[match]
+          return colours[match - 1]
         matchedMessages[rowIndex + '-' + blockIndex] = " > Matched #{matches.length} on #{_dir} - index #{rowIndex}/#{blockIndex} - #{matchedColours}"
   return _grid
 
@@ -157,7 +157,10 @@ drawGrid = (_grid) ->
   for row in _grid
     line = ''
     for block in row
-      line += chalk[chalkColours[block]]("  ")
+      try
+        line += chalk[chalkColours[block]]("  ")
+      catch e
+        console.log "Could not find chalk colour #{block}"
     output.push chalk.cyan '|' + line + '|'
   output.push chalk.cyan '*' + (new Array(grid[0].length + 1).join "^^") + '*'
   return output
