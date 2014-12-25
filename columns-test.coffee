@@ -2,23 +2,6 @@ chalk = require 'chalk'
 _ = require 'underscore'
 {argv} = require 'yargs'
 
-grid = [
-  #0 #1 #2 #3 #4 #5
-  [0, 0, 0, 0, 0, 0] # 0
-  [0, 0, 0, 0, 0, 0] # 1
-  [0, 0, 0, 0, 0, 0] # 2
-  [0, 0, 0, 0, 0, 0] # 3
-  [0, 0, 0, 0, 0, 0] # 4
-  [0, 0, 0, 0, 0, 0] # 5
-  [0, 0, 0, 0, 0, 0] # 6
-  [0, 0, 0, 0, 0, 0] # 7
-  [0, 0, 0, 0, 0, 0] # 8
-  [0, 0, 0, 0, 0, 0] # 9
-  [0, 0, 0, 0, 0, 0] # 10
-  [0, 0, 0, 0, 0, 0] # 11
-  [0, 0, 0, 0, 0, 0] # 12
-]
-
 colours = [
   'red'
   'white' #'orange' # Should be orange
@@ -38,6 +21,9 @@ chalkColours = [
   'bgBlue'
   'bgMagenta'
 ]
+
+# Create a 13 x 6 matrix of zeroes.
+grid = ((0 for [0...6]) for [0...13])
 
 tick = null
 gridDrawing = []
@@ -63,18 +49,33 @@ Array::chunk = (chunkSize) ->
     (if i % chunkSize then [] else [array.slice(i, i + chunkSize)])
 
 # Rotate the array 45 degrees.
-Array::rotate45 = ->
-  arr = this
+Array::rotate45 = (reversed = 0) ->
+  arr = @
   # Max index of diagonal matrix.
-  summax = (arr.length - 1) * (arr[0].length - 1)
+  summax = Math.abs arr.length + arr[0].length - 1
   # Create empty matrix and push in the number of rows required.
-  rotated = []
-  for i in summax
-    rotated.push []
+  rotated = ([] for [0...summax])
   # Fill the new array by partitioning the original matrix.
-  for j in arr[0].length
-    for i in arr.length
-      rotated[i + j].push arr[i][j]
+  for x in [0...arr[0].length]
+    for y in [0...arr.length]
+      # cell = if reversed then arr[x][y] else arr[y][x]
+      cell = arr[y][x]
+      rotated[y].push cell
+  return rotated
+
+# Reshift the rotated array back 45 degrees.
+Array::reshift45 = () ->
+  arr = @
+  # Max index of reshifted matrix.
+  summax = Math.abs arr.length - arr[0].length + 1
+  # Create empty matrix and push in the number of rows required.
+  rotated = ([] for [0...summax])
+  # Fill the new array by partitioning the original matrix.
+  for x in [0...arr[0].length]
+    for y in [0...arr.length]
+      # cell = if reversed then arr[x][y] else arr[y][x]
+      cell = arr[x][y - x]
+      rotated[y + x].push cell
   return rotated
 
 # Apply the current column to the grid.
@@ -124,7 +125,8 @@ columnTick = () ->
     column.y++
 
 
-updateLines = (_grid, _dir) ->
+checkMatches = (_grid, _dir) ->
+  toRemove = []
   for row, rowIndex in _grid
     matches = []
     for block, blockIndex in row
@@ -139,18 +141,40 @@ updateLines = (_grid, _dir) ->
       # Reset and push if it's a standard 'different' block.
         matches = [block]
       if matches.length >= 3
-        for i in [0..2]
-          _grid[rowIndex][blockIndex - i] = 0
+        for i in [2..0] by -1
+          toRemove.push [rowIndex, blockIndex - i]
         matchedColours = matches.map (match) ->
           return colours[match - 1]
         matchedMessages[rowIndex + '-' + blockIndex] = " > Matched #{matches.length} on #{_dir} - index #{rowIndex}/#{blockIndex} - #{matchedColours}"
-  return _grid
+  return toRemove
 
 updateGrid = (_grid) ->
+  toRemove = []
+
   # Check horizontal...
-  grid = updateLines _grid, 'x'
+  h = checkMatches _grid, 'x'
+  if h? and h.length then toRemove.push h
+
   # Check vertical...
-  grid = (updateLines _grid.rotate(), 'y').rotate()
+  y = checkMatches _grid.rotate(), 'y'
+  if y? and y.length then toRemove.push y.map (l) -> l.reverse()
+
+  # Check diagonal...
+  # d1 = checkMatches _grid.rotate45(0), 'd'
+
+  if d1? and d1.length then toRemove.push d1
+  # Check other diagonal...
+  # toRemove.push (checkMatches _grid.rotate45(1), 'd')
+
+  collapseDown toRemove
+
+collapseDown = (toRemove = []) ->
+  if toRemove.length
+    toRemove.forEach (removal) -> removal.forEach (cell) ->
+      grid[cell[0]][cell[1]] = 0
+      for i in [cell[0]..0] by -1
+        if grid[i - 1]? then grid[i][cell[1]] = grid[i - 1][cell[1]]
+    updateGrid _grid
 
 drawGrid = (_grid) ->
   output = []
