@@ -28,9 +28,23 @@ grid = ((0 for [0...6]) for [0...13])
 tick = null
 gridDrawing = []
 matchedMessages = {}
+column = {}
+tickSpeed = 200
 
 # Number of colours, or null for full gamut. Don't use 1 or lower or 'BOOM'.
 numColours = argv.colours - 1 or (colours.length - 1)
+
+keypress = require 'keypress'
+keypress process.stdin
+process.stdin.setRawMode true
+process.stdin.resume()
+process.stdin.on 'keypress', (ch, key) ->
+  if key.name is 'left' and column.x? and column.x > 0 then column.x--
+  if key.name is 'right' and column.x? and column.x < grid[0].length - 1 then column.x++
+  if key.name is 'up' then cycleBlocks(0)
+  if key.name is 'down' then cycleBlocks(1)
+  if key and key.ctrl and key.name is 'c' then process.exit()
+
 
 # Add slow but acceptable array rotation. Sure there's cleverer stuff out there.
 # It's technically folding/transposing, but rotate sounds better.
@@ -88,8 +102,8 @@ applyColumn = (column) ->
     else
       grid[j][column.x] = column.blocks[i]
   gridDrawing.push drawGrid grid
-  updateGrid grid
   die() if willDie
+  updateGrid grid
 
 start = () ->
   # tick = setTimeout columnTick, 0
@@ -103,26 +117,43 @@ columnTick = () ->
   column =
     blocks: []
     blocksAsColours: []
-    x: Math.round Math.random() * (grid[0].length - 1)
+    # x: Math.round Math.random() * (grid[0].length - 1)
+    x: Math.ceil grid[0].length / 2
     y: 0
 
   # Create 3-colour array for blocks.
   for i in [0..2]
     x = column.blocks.push 1 + Math.round Math.random() * (numColours)
     column.blocksAsColours.push colours[x]
+
   # @todo Make asyncronous and based on a timer/actual ticks.
   _l = grid.length
-  for i in [0.._l]
+  # for i in [0.._l]
+  timer = setInterval () =>
+    _grid = _.map grid, _.clone
+    for i in [0..2]
+      j = column.y - i - 1
+      if _grid[j] then _grid[j][column.x] = column.blocks[i]
+
+    xyz = drawGrid(_grid)
+    console.log xyz.join '\n'
     if column.y >= grid.length
       # console.log 'hit bottom!'
-      applyColumn column
-      return columnTick()
+      clearInterval timer
+      return setTimeout () ->
+        applyColumn column
+        return columnTick()
+      , 500
     if grid[column.y][column.x] > 0
       # console.log 'hit another column'
-      applyColumn column
-      return columnTick()
+      clearInterval timer
+      return setTimeout () ->
+        applyColumn column
+        return columnTick()
+      , 500
     # console.log column.x, column.y
     column.y++
+  , tickSpeed
 
 
 checkMatches = (_grid, _dir) ->
@@ -174,15 +205,23 @@ collapseDown = (toRemove = []) ->
       grid[cell[0]][cell[1]] = 0
       for i in [cell[0]..0] by -1
         if grid[i - 1]? then grid[i][cell[1]] = grid[i - 1][cell[1]]
-    updateGrid _grid
+    updateGrid grid
+
+cycleBlocks = (dir = 1) ->
+  if dir
+    column.blocks.push column.blocks.shift()
+  else
+    column.blocks.unshift column.blocks.pop()
 
 drawGrid = (_grid) ->
+  if !_grid then _grid = grid.slice 0
   output = []
   for row in _grid
     line = ''
     for block in row
       try
         line += chalk[chalkColours[block]]("  ")
+        # line += " #{block} "
       catch e
         console.log "Could not find chalk colour #{block}"
     output.push chalk.cyan '|' + line + '|'
