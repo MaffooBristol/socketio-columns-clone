@@ -29,7 +29,9 @@ tick = null
 gridDrawing = []
 matchedMessages = {}
 column = {}
-tickSpeed = 200
+tickSpeed = if argv.tickSpeed? then argv.tickSpeed else 200
+gracePeriod = if argv.gracePeriod? then argv.gracePeriod else 500
+randomSpawn = if argv.randomSpawn? then argv.randomSpawn else false
 
 # Number of colours, or null for full gamut. Don't use 1 or lower or 'BOOM'.
 numColours = argv.colours - 1 or (colours.length - 1)
@@ -117,9 +119,11 @@ columnTick = () ->
   column =
     blocks: []
     blocksAsColours: []
-    # x: Math.round Math.random() * (grid[0].length - 1)
     x: Math.ceil grid[0].length / 2
     y: 0
+
+  if !tickSpeed or randomSpawn
+    column.x = Math.round Math.random() * (grid[0].length - 1)
 
   # Create 3-colour array for blocks.
   for i in [0..2]
@@ -130,27 +134,30 @@ columnTick = () ->
   _l = grid.length
   # for i in [0.._l]
   timer = setInterval () =>
-    _grid = _.map grid, _.clone
-    for i in [0..2]
-      j = column.y - i - 1
-      if _grid[j] then _grid[j][column.x] = column.blocks[i]
 
-    xyz = drawGrid(_grid)
-    console.log xyz.join '\n'
+    if tickSpeed
+      _grid = _.map grid, _.clone
+      for i in [0..2]
+        j = column.y - i - 1
+        if _grid[j] then _grid[j][column.x] = column.blocks[i]
+
+      xyz = drawGrid(_grid)
+      console.log xyz.join '\n'
+
     if column.y >= grid.length
       # console.log 'hit bottom!'
       clearInterval timer
       return setTimeout () ->
         applyColumn column
         return columnTick()
-      , 500
+      , gracePeriod
     if grid[column.y][column.x] > 0
       # console.log 'hit another column'
       clearInterval timer
       return setTimeout () ->
         applyColumn column
         return columnTick()
-      , 500
+      , gracePeriod
     # console.log column.x, column.y
     column.y++
   , tickSpeed
